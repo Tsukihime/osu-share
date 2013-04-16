@@ -508,6 +508,7 @@ var
   resstr: ansistring;
   FPath: ansistring;
 begin
+{$IFDEF DEBUG}
   EnterCriticalSection(lpCriticalSection);
   try
     try
@@ -530,6 +531,7 @@ begin
   finally
     LeaveCriticalSection(lpCriticalSection);
   end;
+{$ENDIF}
 end;
 
 initialization
