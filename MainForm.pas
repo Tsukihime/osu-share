@@ -36,37 +36,45 @@ type
     N1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure SearchEditKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure VSTGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
-      var Ghosted: Boolean; var ImageIndex: Integer);
+    procedure SearchEditKeyUp(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure VSTGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Kind: TVTImageKind; Column: TColumnIndex; var Ghosted: Boolean;
+      var ImageIndex: Integer);
     procedure FormShow(Sender: TObject);
     procedure PuushButtonClick(Sender: TObject);
     procedure ShareLinkButtonClick(Sender: TObject);
-    procedure IdHTTPServerCommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo;
-      AResponseInfo: TIdHTTPResponseInfo);
-    procedure VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
-      var CellText: string);
+    procedure IdHTTPServerCommandGet(AContext: TIdContext;
+      ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
+    procedure VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
     procedure OptionsButtonClick(Sender: TObject);
     procedure VSTNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
     procedure ActionRefresh(Sender: TObject);
-    procedure VSTBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
-      Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+    procedure VSTBeforeCellPaint(Sender: TBaseVirtualTree;
+      TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+      CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
     procedure Timer1Timer(Sender: TObject);
     procedure IdHTTPServerConnect(AContext: TIdContext);
     procedure IdHTTPServerDisconnect(AContext: TIdContext);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
-      var CellText: string);
-    procedure UVSTBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
-      Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+    procedure UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
+    procedure UVSTBeforeCellPaint(Sender: TBaseVirtualTree;
+      TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+      CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
     procedure Exit1Click(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure TrayIconClick(Sender: TObject);
     procedure Show1Click(Sender: TObject);
+    procedure VSTKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
-    procedure IterateSearchCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
-    procedure IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
-    procedure IterateUpdateCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+    procedure IterateSearchCallback(Sender: TBaseVirtualTree;
+      Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+    procedure IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Data: Pointer; var Abort: Boolean);
+    procedure IterateUpdateCallback(Sender: TBaseVirtualTree;
+      Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
     procedure UploadFinish(Sender: TObject);
     procedure IdleEventHandler(Sender: TObject; var Done: Boolean);
   public
@@ -173,24 +181,27 @@ begin
   frmSettings.ShowModal;
 end;
 
-procedure TListForm.SearchEditKeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+procedure TListForm.SearchEditKeyUp(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
 begin
   VST.IterateSubtree(nil, IterateSearchCallback, nil);
 end;
 
-procedure TListForm.IterateSearchCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer;
-  var Abort: Boolean);
+procedure TListForm.IterateSearchCallback(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 var
   CanPass: Boolean;
 begin
   CanPass := true;
   if (length(SearchEdit.Text) > 0) then
-    CanPass := (pos(AnsiLowerCase(SearchEdit.Text), AnsiLowerCase(MapList[Node.index].name)) > 0);
+    CanPass := (pos(AnsiLowerCase(SearchEdit.Text),
+      AnsiLowerCase(MapList[Node.index].name)) > 0);
   Sender.IsVisible[Node] := CanPass;
 end;
 
-procedure TListForm.VSTBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
-  Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+procedure TListForm.VSTBeforeCellPaint(Sender: TBaseVirtualTree;
+  TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+  CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
 var
   bmp: TBitmap;
   i: Integer;
@@ -203,27 +214,37 @@ begin
   bmp.Free;
 end;
 
-procedure TListForm.VSTGetImageIndex(Sender: TBaseVirtualTree; Node: PVirtualNode; Kind: TVTImageKind;
-  Column: TColumnIndex; var Ghosted: Boolean; var ImageIndex: Integer);
+procedure TListForm.VSTGetImageIndex(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
+  var Ghosted: Boolean; var ImageIndex: Integer);
 begin
   ImageIndex := 0;
 end;
 
-procedure TListForm.VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex;
-  TextType: TVSTTextType; var CellText: string);
+procedure TListForm.VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
+  Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
 var
   map: TOsuMap;
 begin
   map := MapList[Node.index];
   if map.IsInitialized then
   begin
-    CellText := map.Artist + ' - ' + map.Title + ' '#13#10'Creator: ' + map.Creator + ' '#13#10'Source: ' + map.Source;
+    CellText := map.Artist + ' - ' + map.Title + ' '#13#10'Creator: ' +
+      map.Creator + ' '#13#10'Source: ' + map.Source;
   end
   else
     CellText := map.name;
 end;
 
-procedure TListForm.VSTNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
+procedure TListForm.VSTKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if (GetAsyncKeyState(VK_CONTROL) <> 0) and (Key = ord('C')) then
+    ShareLinkButtonClick(ShareLinkButton);
+end;
+
+procedure TListForm.VSTNodeClick(Sender: TBaseVirtualTree;
+  const HitInfo: THitInfo);
 begin
   MapList[HitInfo.HitNode.index].InitMap;
   Sender.MultiLine[HitInfo.HitNode] := true;
@@ -244,7 +265,8 @@ begin
   else
     s := MapList[i].name;
 
-  Clipboard.AsText := format('direct link: [http://%s:%d/%d.osz %s]', [Config.Host, Config.port, i, s]);
+  Clipboard.AsText := format('direct link: [http://%s:%d/%d.osz %s]',
+    [Config.Host, Config.port, i, s]);
   StatusBar1.Panels[3].Text := '"' + s + '" was copied to clipboard';
 end;
 
@@ -258,7 +280,8 @@ begin
   Show;
 end;
 
-procedure TListForm.IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+procedure TListForm.IterateSelCallback(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   Integer(Data^) := Node.index;
   Abort := true;
@@ -271,10 +294,11 @@ begin
   UVST.Invalidate;
 end;
 
-procedure TListForm.IterateUpdateCallback(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer;
-  var Abort: Boolean);
+procedure TListForm.IterateUpdateCallback(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
-  if (Sender.IsEffectivelyVisible[Node]) and (not MapList[Node.index].IsInitialized) then
+  if (Sender.IsEffectivelyVisible[Node]) and
+    (not MapList[Node.index].IsInitialized) then
   begin
     MapList[Node.index].InitMap;
     Abort := true;
@@ -307,8 +331,9 @@ begin
   end;
 end;
 
-procedure TListForm.UVSTBeforeCellPaint(Sender: TBaseVirtualTree; TargetCanvas: TCanvas; Node: PVirtualNode;
-  Column: TColumnIndex; CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
+procedure TListForm.UVSTBeforeCellPaint(Sender: TBaseVirtualTree;
+  TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+  CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
 var
   i: Integer;
   bmp: TBitmap;
@@ -327,8 +352,8 @@ begin
   end;
 end;
 
-procedure TListForm.UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode; Column: TColumnIndex;
-  TextType: TVSTTextType; var CellText: string);
+procedure TListForm.UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
+  Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
 var
   i: Integer;
 begin
@@ -345,8 +370,8 @@ begin
     end;
 end;
 
-procedure TListForm.IdHTTPServerCommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo;
-  AResponseInfo: TIdHTTPResponseInfo);
+procedure TListForm.IdHTTPServerCommandGet(AContext: TIdContext;
+  ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
 
   function MyEncodeUrl(Source: string): string;
   var
@@ -354,7 +379,8 @@ procedure TListForm.IdHTTPServerCommandGet(AContext: TIdContext; ARequestInfo: T
   begin
     result := '';
     for i := 1 to length(Source) do
-      if not(Source[i] in ['A' .. 'Z', 'a' .. 'z', '0', '1' .. '9', '-', '_', '~', '.']) then
+      if not(Source[i] in ['A' .. 'Z', 'a' .. 'z', '0', '1' .. '9', '-', '_',
+        '~', '.']) then
         result := result + '%' + inttohex(ord(Source[i]), 2)
       else
         result := result + Source[i];
@@ -396,17 +422,20 @@ begin
       AResponseInfo.ContentType := 'text/html';
       AResponseInfo.ResponseNo := 404;
       AResponseInfo.ContentLength := stream.Size;
-      AResponseInfo.ContentStream := stream; // тут нельзя разрушить stream.Free; его порушит сам серв
+      AResponseInfo.ContentStream := stream;
+      // тут нельзя разрушить stream.Free; его порушит сам серв
       exit;
     end;
     MakeOsz(MapList[i].Path, stream);
     AResponseInfo.ContentType := 'application/octet-stream';
-    AResponseInfo.CustomHeaders.Values['Content-disposition'] := 'attachment; filename=' +
-      '"' + StringReplace(MapList[i].name, ' ', '%20', [rfReplaceAll]) + '.osz";';
+    AResponseInfo.CustomHeaders.Values['Content-disposition'] :=
+      'attachment; filename=' + '"' + StringReplace(MapList[i].name, ' ', '%20',
+      [rfReplaceAll]) + '.osz";';
 
     AResponseInfo.ContentText := '';
     AResponseInfo.ContentLength := stream.Size;
-    AResponseInfo.ContentStream := stream; // тут нельзя разрушить stream.Free; его порушит сам серв
+    AResponseInfo.ContentStream := stream;
+    // тут нельзя разрушить stream.Free; его порушит сам серв
   except
   end;
 end;
