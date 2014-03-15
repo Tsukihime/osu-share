@@ -3,7 +3,7 @@
 			<ProjectGuid>{373A213A-5693-49EA-B398-25F7824152DE}</ProjectGuid>
 			<MainSource>osu_share.dpr</MainSource>
 			<Base>True</Base>
-			<Config Condition="'$(Config)'==''">Release</Config>
+			<Config Condition="'$(Config)'==''">Debug</Config>
 			<TargetedPlatforms>1</TargetedPlatforms>
 			<AppType>Application</AppType>
 			<FrameworkType>VCL</FrameworkType>
@@ -45,7 +45,6 @@
 			<Manifest_File>None</Manifest_File>
 			<DCC_UnitSearchPath>D:\Programming\delphicomp\VirtualTreeViewV5.0.1\Source;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
 			<Icon_MainIcon>fire.ico</Icon_MainIcon>
-			<VCL_Custom_Styles>&quot;Smokey Quartz Kamri|VCLSTYLE|$(PUBLIC)\Documents\RAD Studio\9.0\Styles\SmokeyQuartzKamri.vsf&quot;</VCL_Custom_Styles>
 			<VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
 			<VerInfo_Locale>1049</VerInfo_Locale>
 			<DCC_Namespace>Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;System.Bindings;$(DCC_Namespace)</DCC_Namespace>
@@ -92,12 +91,11 @@
 				<MainSource>MainSource</MainSource>
 			</DelphiCompile>
 			<DCCReference Include="MainForm.pas">
-				<Form>ListForm</Form>
+				<Form>OsuShareListForm</Form>
 			</DCCReference>
 			<DCCReference Include="Core.pas"/>
-			<DCCReference Include="Settingsfrm.pas">
-				<Form>frmSettings</Form>
-			</DCCReference>
+			<DCCReference Include="MapServer.pas"/>
+			<DCCReference Include="OsuTrackSpy.pas"/>
 			<RcItem Include="404.htm">
 				<ContainerId>ResourceItem</ContainerId>
 				<ResourceType>RCDATA</ResourceType>

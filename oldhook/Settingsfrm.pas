@@ -56,7 +56,7 @@ begin
   Config.OsuSongPath := osuDirEdit.Text;
   if IpEdit.Text <> '' then
     Config.Host := IpEdit.Text;
-  ListForm.RefreshList;
+  OsuShareListForm.RefreshList;
   Close;
 end;
 

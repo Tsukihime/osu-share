@@ -3,21 +3,21 @@ unit MainForm;
 interface
 
 uses
-  Windows, Messages, IdBaseComponent, IdComponent, IdCustomTCPServer,
-  IdCustomHTTPServer, IdHTTPServer, IdContext, Vcl.Forms, Vcl.Controls,
+  Windows, Messages, Vcl.Forms, Vcl.Controls,
   Vcl.Buttons, Vcl.ExtCtrls, Vcl.Menus, System.Classes, Vcl.ActnList,
   Vcl.ImgList, Vcl.ComCtrls, Vcl.StdCtrls, VirtualTrees,
   //
-  Sysutils, Graphics, registry, clipbrd, System.Generics.Collections, Core;
+  Sysutils, Graphics, registry, clipbrd, System.Generics.Collections, Core,
+  MapServer, ShellApi, OsuTrackSpy;
 
 type
-  TListForm = class(TForm)
+  TOsuShareListForm = class(TForm, IMapKeeper)
     VST: TVirtualStringTree;
     icons: TImageList;
     Panel1: TPanel;
     SearchEdit: TEdit;
     ActionList: TActionList;
-    Action1: TAction;
+    ActRefresh: TAction;
     PuushButton: TButton;
     ShareLinkButton: TButton;
     buttonIcons: TImageList;
@@ -27,8 +27,6 @@ type
     BGImageList: TImageList;
     Timer1: TTimer;
     StatusBar1: TStatusBar;
-    OptionsButton: TButton;
-    IdHTTPServer: TIdHTTPServer;
     ImageList1: TImageList;
     UVST: TVirtualStringTree;
     Splitter1: TSplitter;
@@ -44,19 +42,14 @@ type
     procedure FormShow(Sender: TObject);
     procedure PuushButtonClick(Sender: TObject);
     procedure ShareLinkButtonClick(Sender: TObject);
-    procedure IdHTTPServerCommandGet(AContext: TIdContext;
-      ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
     procedure VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
-    procedure OptionsButtonClick(Sender: TObject);
     procedure VSTNodeClick(Sender: TBaseVirtualTree; const HitInfo: THitInfo);
     procedure ActionRefresh(Sender: TObject);
     procedure VSTBeforeCellPaint(Sender: TBaseVirtualTree;
       TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
       CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
     procedure Timer1Timer(Sender: TObject);
-    procedure IdHTTPServerConnect(AContext: TIdContext);
-    procedure IdHTTPServerDisconnect(AContext: TIdContext);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
@@ -69,43 +62,40 @@ type
     procedure Show1Click(Sender: TObject);
     procedure VSTKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
+    FOsuTrackPath: string;
+    FOsuMapIndex: Integer;
     procedure IterateSearchCallback(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
     procedure IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Data: Pointer; var Abort: Boolean);
     procedure IterateUpdateCallback(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
-    procedure UploadFinish(Sender: TObject);
+    procedure IterateFlashCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
+      Data: Pointer; var Abort: Boolean);
     procedure IdleEventHandler(Sender: TObject; var Done: Boolean);
   public
     procedure RefreshList;
+    function GetMap(ServReq: string; var MapName: string): TUploadStream;
   end;
 
 var
-  ListForm: TListForm;
+  OsuShareListForm: TOsuShareListForm;
   MapList: TObjectList<TOsuMap>;
-  Uploads: TObjectList<TUploadStream>;
-  ConnectedClients: Integer = 0;
+  MapServ: TMapServer;
   Config: TConfig;
+  TrackSpy: TOsuTrackSpy;
   toClose: Boolean = false;
 
 implementation
 
 {$R *.dfm}
 
-uses Settingsfrm, dialogs;
+uses dialogs;
 
-procedure TListForm.RefreshList;
-var
-  a, b, c: int64;
+procedure TOsuShareListForm.RefreshList;
 begin
   MapList.Clear;
-  QueryPerformanceCounter(a);
-  QueryPerformanceFrequency(c);
   GetMapList(Config.OsuSongPath, MapList);
-  QueryPerformanceCounter(b);
-
-  DbgPrint(format('GetMapList %f sec', [(b - a) / c]));
 
   VST.Clear;
   VST.RootNodeCount := MapList.Count;
@@ -118,76 +108,88 @@ begin
   ShareLinkButton.Enabled := true;
 end;
 
-procedure TListForm.ActionRefresh(Sender: TObject);
+procedure TOsuShareListForm.ActionRefresh(Sender: TObject);
 begin
   RefreshList;
 end;
 
-procedure TListForm.Exit1Click(Sender: TObject);
+procedure TOsuShareListForm.Exit1Click(Sender: TObject);
 begin
   toClose := true;
   Close;
 end;
 
-procedure TListForm.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TOsuShareListForm.FormClose(Sender: TObject;
+  var Action: TCloseAction);
 begin
   TrayIcon.Visible := false;
 end;
 
-procedure TListForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+procedure TOsuShareListForm.FormCloseQuery(Sender: TObject;
+  var CanClose: Boolean);
 begin
   if not toClose then
     Hide;
   CanClose := toClose;
 end;
 
-procedure TListForm.FormCreate(Sender: TObject);
-var
-  a, b, c: int64;
+procedure TOsuShareListForm.FormCreate(Sender: TObject);
 begin
   Application.OnIdle := IdleEventHandler;
-  QueryPerformanceFrequency(c);
-  QueryPerformanceCounter(a);
   Config := TConfig.Create('osu!share.ini', 'osu!share');
-  QueryPerformanceCounter(b);
-  DbgPrint(format('TConfig.Create %f sec', [(b - a) / c]));
-
   MapList := TObjectList<TOsuMap>.Create(true);
-  Uploads := TObjectList<TUploadStream>.Create(false);
   DirRemove(Config.TempPath);
   CreateDir(Config.TempPath);
+  MapServ := TMapServer.Create(self);
+  MapServ.Port := Config.Port;
+  MapServ.Run;
+  FOsuMapIndex := -1;
+
+  TrackSpy := TOsuTrackSpy.Create;
+  TrackSpy.Connect;
 end;
 
-procedure TListForm.FormDestroy(Sender: TObject);
+procedure TOsuShareListForm.FormDestroy(Sender: TObject);
 begin
+  MapServ.Stop;
+  MapServ.Free;
   MapList.Free;
-  Uploads.Free;
   DirRemove(Config.TempPath);
   Config.Free;
 end;
 
-procedure TListForm.FormShow(Sender: TObject);
-var
-  ThreadID: cardinal;
+procedure TOsuShareListForm.FormShow(Sender: TObject);
 begin
   RefreshList;
-  OptionsButton.Parent := StatusBar1;
-  OptionsButton.Top := 0;
-  OptionsButton.Left := 0;
 end;
 
-procedure TListForm.OptionsButtonClick(Sender: TObject);
+function TOsuShareListForm.GetMap(ServReq: string; var MapName: string)
+  : TUploadStream;
+var
+  i: Integer;
+  us: TUploadStream;
 begin
-  frmSettings.ShowModal;
+  Result := nil;
+  if TryStrToInt(ServReq, i) or (i < 0) or (i >= MapList.Count) then
+  begin
+    us := TUploadStream.Create;
+    MakeOsz(MapList[i].Path, us);
+    Result := us;
+
+    if MapList[i].IsInitialized then
+      MapName := MapList[i].Artist + ' - ' + MapList[i].Title
+    else
+      MapName := MapList[i].name;
+  end;
 end;
 
-procedure TListForm.SearchEditKeyUp(Sender: TObject; var Key: Word;
+procedure TOsuShareListForm.SearchEditKeyUp(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 begin
   VST.IterateSubtree(nil, IterateSearchCallback, nil);
 end;
 
-procedure TListForm.IterateSearchCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.IterateSearchCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 var
   CanPass: Boolean;
@@ -199,7 +201,7 @@ begin
   Sender.IsVisible[Node] := CanPass;
 end;
 
-procedure TListForm.VSTBeforeCellPaint(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.VSTBeforeCellPaint(Sender: TBaseVirtualTree;
   TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
   CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
 var
@@ -207,6 +209,8 @@ var
   i: Integer;
 begin
   i := 0;
+  if Node.index = FOsuMapIndex then
+    i := 1;
   bmp := TBitmap.Create;
   bmp.SetSize(CellRect.Width, CellRect.Height);
   BGImageList.GetBitmap(i, bmp);
@@ -214,36 +218,40 @@ begin
   bmp.Free;
 end;
 
-procedure TListForm.VSTGetImageIndex(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.VSTGetImageIndex(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
   var Ghosted: Boolean; var ImageIndex: Integer);
 begin
   ImageIndex := 0;
 end;
 
-procedure TListForm.VSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
-  Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
+procedure TOsuShareListForm.VSTGetText(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
+  var CellText: string);
 var
   map: TOsuMap;
 begin
   map := MapList[Node.index];
   if map.IsInitialized then
   begin
-    CellText := map.Artist + ' - ' + map.Title + ' '#13#10'Creator: ' +
-      map.Creator + ' '#13#10'Source: ' + map.Source;
+    if map.Source = '' then
+      CellText := Format('%s - %s [%s]', [map.Artist, map.Title, map.Creator])
+    else
+      CellText := Format('%s (%s) - %s [%s]', [map.Source, map.Artist,
+        map.Title, map.Creator])
   end
   else
     CellText := map.name;
 end;
 
-procedure TListForm.VSTKeyDown(Sender: TObject; var Key: Word;
+procedure TOsuShareListForm.VSTKeyDown(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 begin
   if (GetAsyncKeyState(VK_CONTROL) <> 0) and (Key = ord('C')) then
     ShareLinkButtonClick(ShareLinkButton);
 end;
 
-procedure TListForm.VSTNodeClick(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.VSTNodeClick(Sender: TBaseVirtualTree;
   const HitInfo: THitInfo);
 begin
   MapList[HitInfo.HitNode.index].InitMap;
@@ -251,7 +259,18 @@ begin
   Sender.Invalidate;
 end;
 
-procedure TListForm.ShareLinkButtonClick(Sender: TObject);
+procedure TOsuShareListForm.IterateFlashCallback(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+begin
+  if Integer(Data) = Node.index then
+  begin
+    Sender.ScrollIntoView(Node, true, false);
+    Sender.Selected[Node] := true;
+    Abort := true;
+  end;
+end;
+
+procedure TOsuShareListForm.ShareLinkButtonClick(Sender: TObject);
 var
   i: Integer;
   s: string;
@@ -265,36 +284,59 @@ begin
   else
     s := MapList[i].name;
 
-  Clipboard.AsText := format('direct link: [http://%s:%d/%d.osz %s]',
-    [Config.Host, Config.port, i, s]);
+  Clipboard.AsText := Format('direct link - [http://%s:%d/%d.osz %s]',
+    [Config.Host, Config.Port, i, s]);
   StatusBar1.Panels[3].Text := '"' + s + '" was copied to clipboard';
 end;
 
-procedure TListForm.Show1Click(Sender: TObject);
+procedure TOsuShareListForm.Show1Click(Sender: TObject);
 begin
   Show;
 end;
 
-procedure TListForm.TrayIconClick(Sender: TObject);
+procedure TOsuShareListForm.TrayIconClick(Sender: TObject);
 begin
   Show;
 end;
 
-procedure TListForm.IterateSelCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.IterateSelCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   Integer(Data^) := Node.index;
   Abort := true;
 end;
 
-procedure TListForm.Timer1Timer(Sender: TObject);
+procedure TOsuShareListForm.Timer1Timer(Sender: TObject);
+var
+  s: string;
+  i: Integer;
 begin
-  StatusBar1.Panels[1].Text := format('Connected: %d', [ConnectedClients]);
-  UVST.RootNodeCount := Uploads.Count;
+  StatusBar1.Panels[1].Text := Format('Connected: %d', [MapServ.Connections]);
+  UVST.RootNodeCount := MapServ.CurrentUploads.Count;
   UVST.Invalidate;
+
+  if TrackSpy.Connected then
+  begin
+    s := TrackSpy.FilePath;
+    if FOsuTrackPath <> s then
+    begin
+      FOsuTrackPath := s;
+      s := ExtractFilePath(FOsuTrackPath);
+      Delete(s, length(s), 1);
+      for i := 0 to MapList.Count - 1 do
+        if s = MapList[i].Path then
+        begin
+          FOsuMapIndex := i;
+          VST.IterateSubtree(nil, IterateFlashCallback, Pointer(i));
+          break;
+        end;
+    end;
+  end
+  else
+    TrackSpy.Connect;
 end;
 
-procedure TListForm.IterateUpdateCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.IterateUpdateCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   if (Sender.IsEffectivelyVisible[Node]) and
@@ -306,32 +348,33 @@ begin
   Sender.MultiLine[Node] := true;
 end;
 
-procedure TListForm.PuushButtonClick(Sender: TObject);
+procedure TOsuShareListForm.PuushButtonClick(Sender: TObject);
 var
   index: Integer;
   stream: TFileStream;
-  songname, filepath: string;
+  songname, FilePath: string;
 begin
   index := -1;
   VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
   if index < 0 then
     exit;
   songname := MapList[index].name;
-  filepath := Config.TempPath + '/' + MapList[index].name + '.osz';
+  FilePath := Config.TempPath + '/' + MapList[index].name + '.osz';
 
-  if not FileExists(filepath) then
+  if not FileExists(FilePath) then
   begin
-    stream := TFileStream.Create(filepath, fmCreate);
+    stream := TFileStream.Create(FilePath, fmCreate);
     MakeOsz(MapList[index].Path, stream);
     stream.Free;
   end;
   try
-    WinExec(PAnsiChar(Config.PuushPath + '"' + filepath + '"'), 0);
+    ShellExecute(0, 'open', PChar(Config.PuushPath),
+      PChar('-upload "' + FilePath + '"'), '', 0);
   except
   end;
 end;
 
-procedure TListForm.UVSTBeforeCellPaint(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.UVSTBeforeCellPaint(Sender: TBaseVirtualTree;
   TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
   CellPaintMode: TVTCellPaintMode; CellRect: TRect; var ContentRect: TRect);
 var
@@ -340,10 +383,10 @@ var
   r: TRect;
 begin
   i := Node.index;
-  if (i < Uploads.Count) and (Column = 2) then
+  if (i < MapServ.CurrentUploads.Count) and (Column = 2) then
   begin
     r := CellRect;
-    r.Width := trunc(r.Width * Uploads[i].Progress / 100);
+    r.Width := trunc(r.Width * MapServ.CurrentUploads[i].Progress / 100);
     bmp := TBitmap.Create;
     bmp.SetSize(CellRect.Width, CellRect.Height);
     BGImageList.GetBitmap(1, bmp);
@@ -352,113 +395,30 @@ begin
   end;
 end;
 
-procedure TListForm.UVSTGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
-  Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
+procedure TOsuShareListForm.UVSTGetText(Sender: TBaseVirtualTree;
+  Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
+  var CellText: string);
 var
   i: Integer;
 begin
   CellText := '';
   i := Node.index;
-  if i < Uploads.Count then
+  if i < MapServ.CurrentUploads.Count then
     case Column of
       0:
-        CellText := Uploads[i].Address;
+        CellText := MapServ.CurrentUploads[i].Address;
       1:
-        CellText := format('%f KB/s', [Uploads[i].Speed]);
+        CellText := Format('%f KB/s', [MapServ.CurrentUploads[i].Speed]);
       2:
-        CellText := format('%f%%', [Uploads[i].Progress]);
+        CellText := Format('%f%%', [MapServ.CurrentUploads[i].Progress]);
     end;
 end;
 
-procedure TListForm.IdHTTPServerCommandGet(AContext: TIdContext;
-  ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
-
-  function MyEncodeUrl(Source: string): string;
-  var
-    i: Integer;
-  begin
-    result := '';
-    for i := 1 to length(Source) do
-      if not(Source[i] in ['A' .. 'Z', 'a' .. 'z', '0', '1' .. '9', '-', '_',
-        '~', '.']) then
-        result := result + '%' + inttohex(ord(Source[i]), 2)
-      else
-        result := result + Source[i];
-  end;
-
-var
-  stream: TUploadStream;
-  req: string;
-  i: Integer;
-begin
-  try
-    AResponseInfo.Server := 'osu!share by Vladimir, North, Vodka, Bears';
-
-    req := ARequestInfo.Document;
-    delete(req, 1, 1);
-
-    if req = 'ping' then
-    begin
-      AResponseInfo.ContentType := 'text/plain';
-      AResponseInfo.ContentText := 'pong';
-      exit;
-    end;
-
-    stream := TUploadStream.Create;
-    stream.Address := ARequestInfo.RemoteIP;
-    stream.OnDestroy := UploadFinish;
-
-    TThread.Synchronize(TThread.CurrentThread,
-      procedure
-      begin
-        Uploads.Add(stream);
-      end);
-
-    req := StringReplace(req, '.osz', '', [rfReplaceAll]);
-
-    if not TryStrToInt(req, i) or (i < 0) or (i >= MapList.Count) then
-    begin
-      page404(stream);
-      AResponseInfo.ContentType := 'text/html';
-      AResponseInfo.ResponseNo := 404;
-      AResponseInfo.ContentLength := stream.Size;
-      AResponseInfo.ContentStream := stream;
-      // тут нельзя разрушить stream.Free; его порушит сам серв
-      exit;
-    end;
-    MakeOsz(MapList[i].Path, stream);
-    AResponseInfo.ContentType := 'application/octet-stream';
-    AResponseInfo.CustomHeaders.Values['Content-disposition'] :=
-      'attachment; filename=' + '"' + StringReplace(MapList[i].name, ' ', '%20',
-      [rfReplaceAll]) + '.osz";';
-
-    AResponseInfo.ContentText := '';
-    AResponseInfo.ContentLength := stream.Size;
-    AResponseInfo.ContentStream := stream;
-    // тут нельзя разрушить stream.Free; его порушит сам серв
-  except
-  end;
-end;
-
-procedure TListForm.UploadFinish(Sender: TObject);
-begin
-  Uploads.Extract((Sender as TUploadStream));
-end;
-
-procedure TListForm.IdHTTPServerConnect(AContext: TIdContext);
-begin
-  InterlockedIncrement(ConnectedClients);
-end;
-
-procedure TListForm.IdHTTPServerDisconnect(AContext: TIdContext);
-begin
-  InterlockedDecrement(ConnectedClients);
-end;
-
-procedure TListForm.IdleEventHandler(Sender: TObject; var Done: Boolean);
+procedure TOsuShareListForm.IdleEventHandler(Sender: TObject;
+  var Done: Boolean);
 begin
   VST.IterateSubtree(nil, IterateUpdateCallback, nil, [vsVisible]);
-  Done := false;
+  Done := true;
 end;
 
 end.

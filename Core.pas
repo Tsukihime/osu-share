@@ -2,7 +2,8 @@ unit Core;
 
 interface
 
-uses forms, IdHTTP, inifiles, registry, messages, classes, sysutils, windows, winsock,
+uses forms, IdHTTP, inifiles, registry, messages, classes, sysutils, windows,
+  winsock,
   System.Generics.Collections;
 
 type
@@ -38,16 +39,18 @@ type
     FPuushPath: string;
     FTempPath: string;
     FHost: string;
+    FPort: Word;
     FIsWhiteIP: boolean;
     function getOsuSongPath: string;
     function getPuushPath: string;
-    function getPathOfTemp: string;
+    function getTemp: string;
     procedure setOsuSongPath(const Value: string);
     function getHost: string;
     function getPort: Word;
     procedure setHost(const Value: string);
     procedure OnGetIP(Sender: TObject);
     procedure OnPing(Sender: TObject);
+    procedure setPort(const Value: Word);
   public
     constructor Create(iniFileName: string; sectionName: string);
     destructor Destroy; override;
@@ -56,10 +59,10 @@ type
     procedure ReInitExternalAddres;
     property OsuSongPath: string read getOsuSongPath write setOsuSongPath;
     property PuushPath: string read getPuushPath;
-    property TempPath: string read getPathOfTemp;
+    property TempPath: string read getTemp;
     property IsWhiteIP: boolean read FIsWhiteIP;
     property Host: string read getHost write setHost;
-    property port: Word read getPort;
+    property port: Word read getPort write setPort;
   end;
 
   TPingThread = class(TThread)
@@ -99,15 +102,14 @@ type
     property OnDestroy: TNotifyEvent read FOnDestroy write FOnDestroy;
   end;
 
+  IMapKeeper = interface
+    function GetMap(ServReq: string; var MapName: string): TUploadStream;
+  end;
+
 procedure DirRemove(Path: string);
 procedure GetMapList(Path: string; list: TObjectList<TOsuMap>);
 procedure MakeOsz(dir: string; Stream: TStream);
-procedure page404(Stream: TStream);
-
-procedure DbgPrint(s: ansistring);
-
-var
-  lpCriticalSection: TRTLCriticalSection;
+procedure getPage404(Stream: TStream);
 
 implementation
 
@@ -207,7 +209,7 @@ begin
   list.Free;
 end;
 
-procedure page404(Stream: TStream);
+procedure getPage404(Stream: TStream);
 var
   RS: TResourceStream;
 begin
@@ -273,23 +275,21 @@ end;
 
 constructor TConfig.Create(iniFileName: string; sectionName: string);
 var
-  a, b, c: int64;
+  s: string;
 begin
   ini := TMemIniFile.Create(iniFileName);
   FsectionName := sectionName;
-  setValue('beer', 'included');
-  setValue('KawaiiLevel', 'over9000');
-  setValue('Pedobear', 'off');
-  setValue('Loli', 'on');
-  setValue('Nyan', '^^');
-  FOsuSongPath := getValue('OsuSongPath');
-  FHost := getValue('Host');
+  ini.WriteString(FsectionName, 'beer', 'included');
+  ini.WriteString(FsectionName, 'KawaiiLevel', 'over9000');
+  ini.WriteString(FsectionName, 'Loli', 'on');
 
-  QueryPerformanceFrequency(c);
-  QueryPerformanceCounter(a);
+  FOsuSongPath := ini.ReadString(FsectionName, 'OsuSongPath', '');
+  FHost := ini.ReadString(FsectionName, 'Host', '');
+  FPort := ini.ReadInteger(FsectionName, 'Port', 778);
+
+  ini.WriteString(FsectionName, 'Host', FHost);
+  ini.WriteInteger(FsectionName, 'Port', FPort);
   ReInitExternalAddres;
-  QueryPerformanceCounter(b);
-  DbgPrint(format('ReInitExternalAddres %f sec', [(b - a) / c]));
 end;
 
 destructor TConfig.Destroy;
@@ -319,6 +319,7 @@ begin
         s := Reg.ReadString('');
         delete(s, 1, 1);
         FOsuSongPath := ExtractFileDir(s) + '\Songs';
+        setValue('OsuSongPath', FOsuSongPath);
       end;
     finally
       Reg.Free;
@@ -340,7 +341,7 @@ begin
       if Reg.OpenKeyReadOnly('*\shell\puush\command') then
       begin
         s := Reg.ReadString('');
-        FPuushPath := copy(s, 1, pos('%1', s) - 1);
+        FPuushPath := copy(s, 1, pos(' -upload', s) - 1);
       end;
     finally
       Reg.Free;
@@ -349,7 +350,7 @@ begin
   result := FPuushPath;
 end;
 
-function TConfig.getPathOfTemp: string;
+function TConfig.getTemp: string;
 var
   buf: string;
   len: integer;
@@ -366,7 +367,7 @@ end;
 
 function TConfig.getPort: Word;
 begin
-  result := 778;
+  result := FPort;
 end;
 
 function TConfig.getValue(name: string): Variant;
@@ -404,6 +405,12 @@ procedure TConfig.setOsuSongPath(const Value: string);
 begin
   FOsuSongPath := Value;
   setValue('OsuSongPath', FOsuSongPath);
+end;
+
+procedure TConfig.setPort(const Value: Word);
+begin
+  FPort := Value;
+  setValue('port', FPort);
 end;
 
 procedure TConfig.setValue(name: string; Value: Variant);
@@ -471,11 +478,7 @@ end;
 destructor TUploadStream.Destroy;
 begin
   if Assigned(FOnDestroy) then
-    TThread.Synchronize(TThread.CurrentThread,
-      procedure
-      begin
-        FOnDestroy(self);
-      end);
+    FOnDestroy(self);
   inherited;
 end;
 
@@ -501,45 +504,5 @@ begin
   if FStartTime = 0 then
     FStartTime := now;
 end;
-
-procedure DbgPrint(s: ansistring);
-var
-  mode: Word;
-  resstr: ansistring;
-  FPath: ansistring;
-begin
-{$IFDEF DEBUG}
-  EnterCriticalSection(lpCriticalSection);
-  try
-    try
-      FPath := 'DBG_LOG.txt';
-      if FileExists(FPath) then
-        mode := fmOpenWrite
-      else
-        mode := fmCreate;
-      resstr := FormatDateTime('[dd.mm.yy hh:nn:ss.zzz] ', now());
-      s := resstr + '> ' + s;
-      with TFileStream.Create(FPath, mode or fmShareCompat) do
-      begin
-        Seek(Size, soFromBeginning);
-        s := s + #13#10;
-        WriteBuffer(s[1], Length(s));
-        Free;
-      end;
-    except
-    end;
-  finally
-    LeaveCriticalSection(lpCriticalSection);
-  end;
-{$ENDIF}
-end;
-
-initialization
-
-InitializeCriticalSection(lpCriticalSection);
-
-finalization
-
-DeleteCriticalSection(lpCriticalSection);
 
 end.

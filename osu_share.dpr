@@ -5,11 +5,10 @@ program osu_share;
 uses
   windows,
   Forms,
-  MainForm in 'MainForm.pas' {ListForm},
+  MainForm in 'MainForm.pas' {OsuShareListForm},
   Core in 'Core.pas',
-  Settingsfrm in 'Settingsfrm.pas' {frmSettings},
-  Vcl.Themes,
-  Vcl.Styles;
+  MapServer in 'MapServer.pas',
+  OsuTrackSpy in 'OsuTrackSpy.pas';
 
 {$R *.res}
 
@@ -21,10 +20,8 @@ begin
   if (Mutex <> 0) and (GetLastError <> ERROR_ALREADY_EXISTS) then
   begin
     Application.Initialize;
-    TStyleManager.TrySetStyle('Smokey Quartz Kamri');
-  Application.Title := 'osu!share';
-    Application.CreateForm(TListForm, ListForm);
-  Application.CreateForm(TfrmSettings, frmSettings);
+    Application.Title := 'osu!share';
+    Application.CreateForm(TOsuShareListForm, OsuShareListForm);
   Application.Run;
     if (Mutex <> 0) then
       CloseHandle(Mutex)
