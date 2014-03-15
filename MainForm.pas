@@ -64,6 +64,7 @@ type
   private
     FOsuTrackPath: string;
     FOsuMapIndex: Integer;
+    FCopyMapLinkHotKey: Word;
     procedure IterateSearchCallback(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
     procedure IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -73,6 +74,7 @@ type
     procedure IterateFlashCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Data: Pointer; var Abort: Boolean);
     procedure IdleEventHandler(Sender: TObject; var Done: Boolean);
+    procedure WMHotKey(var HTK: TWMHotKey); message WM_HOTKEY;
   public
     procedure RefreshList;
     function GetMap(ServReq: string; var MapName: string): TUploadStream;
@@ -147,10 +149,17 @@ begin
 
   TrackSpy := TOsuTrackSpy.Create;
   TrackSpy.Connect;
+
+  FCopyMapLinkHotKey := GlobalAddAtom('CopyMapLinkHotKey');
+  RegisterHotKey(Handle, FCopyMapLinkHotKey, MOD_CONTROL + MOD_NOREPEAT,
+    ord('M'));
 end;
 
 procedure TOsuShareListForm.FormDestroy(Sender: TObject);
 begin
+  UnRegisterHotKey(Handle, FCopyMapLinkHotKey);
+  GlobalDeleteAtom(FCopyMapLinkHotKey);
+
   MapServ.Stop;
   MapServ.Free;
   MapList.Free;
@@ -257,6 +266,18 @@ begin
   MapList[HitInfo.HitNode.index].InitMap;
   Sender.MultiLine[HitInfo.HitNode] := true;
   Sender.Invalidate;
+end;
+
+procedure TOsuShareListForm.WMHotKey(var HTK: TWMHotKey);
+begin
+  if HTK.HotKey = FCopyMapLinkHotKey then
+  begin
+    ShareLinkButtonClick(ShareLinkButton);
+    keybd_event(VK_CONTROL, 0, 0, 0);
+    keybd_event(ord('V'), 0, 0, 0);
+    keybd_event(ord('V'), 0, KEYEVENTF_KEYUP, 0);
+    keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+  end;
 end;
 
 procedure TOsuShareListForm.IterateFlashCallback(Sender: TBaseVirtualTree;
