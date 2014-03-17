@@ -8,7 +8,7 @@ uses
   Vcl.ImgList, Vcl.ComCtrls, Vcl.StdCtrls, VirtualTrees,
   //
   Sysutils, Graphics, registry, clipbrd, System.Generics.Collections, Core,
-  MapServer, ShellApi, OsuTrackSpy;
+  MapServer, ShellApi, OsuTrackSpy, FSChangeMonitor;
 
 type
   TOsuShareListForm = class(TForm, IMapKeeper)
@@ -84,6 +84,7 @@ var
   OsuShareListForm: TOsuShareListForm;
   MapList: TObjectList<TOsuMap>;
   MapServ: TMapServer;
+  FSMonitor: TFSChangeMonitor;
   Config: TConfig;
   TrackSpy: TOsuTrackSpy;
   toClose: Boolean = false;
@@ -153,6 +154,9 @@ begin
   FCopyMapLinkHotKey := GlobalAddAtom('CopyMapLinkHotKey');
   RegisterHotKey(Handle, FCopyMapLinkHotKey, MOD_CONTROL + MOD_NOREPEAT,
     ord('M'));
+
+  FSMonitor := TFSChangeMonitor.Create(Config.OsuSongPath);
+  FSMonitor.OnChangeHappened := ActionRefresh;
 end;
 
 procedure TOsuShareListForm.FormDestroy(Sender: TObject);
@@ -165,6 +169,7 @@ begin
   MapList.Free;
   DirRemove(Config.TempPath);
   Config.Free;
+  FSMonitor.Free;
 end;
 
 procedure TOsuShareListForm.FormShow(Sender: TObject);

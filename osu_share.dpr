@@ -8,7 +8,8 @@ uses
   MainForm in 'MainForm.pas' {OsuShareListForm},
   Core in 'Core.pas',
   MapServer in 'MapServer.pas',
-  OsuTrackSpy in 'OsuTrackSpy.pas';
+  OsuTrackSpy in 'OsuTrackSpy.pas',
+  FSChangeMonitor in 'FSChangeMonitor.pas';
 
 {$R *.res}
 

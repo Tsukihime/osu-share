@@ -274,8 +274,6 @@ end;
 { TConfig }
 
 constructor TConfig.Create(iniFileName: string; sectionName: string);
-var
-  s: string;
 begin
   ini := TMemIniFile.Create(iniFileName);
   FsectionName := sectionName;

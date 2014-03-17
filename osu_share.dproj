@@ -96,6 +96,7 @@
 			<DCCReference Include="Core.pas"/>
 			<DCCReference Include="MapServer.pas"/>
 			<DCCReference Include="OsuTrackSpy.pas"/>
+			<DCCReference Include="FSChangeMonitor.pas"/>
 			<RcItem Include="404.htm">
 				<ContainerId>ResourceItem</ContainerId>
 				<ResourceType>RCDATA</ResourceType>
