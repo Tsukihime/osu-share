@@ -7,10 +7,12 @@ uses
 
 type
   TFSChangeMonitor = class
+  private
     FOnChangeHappened: TNotifyEvent;
     FThread: THandle;
     FDirPath: string;
     FTerminated: Boolean;
+  public
     constructor Create(ADirPath: string);
     destructor Destroy; override;
     property OnChangeHappened: TNotifyEvent read FOnChangeHappened

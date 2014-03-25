@@ -2,16 +2,43 @@ unit MapServer;
 
 interface
 
-uses IdHTTPServer, IdContext, IdCustomHTTPServer, windows, Core, Classes,
-  Sysutils, System.Generics.Collections, IdURI;
+uses
+  IdHTTPServer,
+  IdContext,
+  IdCustomHTTPServer,
+  windows,
+  Classes,
+  Sysutils,
+  System.Generics.Collections;
 
 type
+  TUploadStream = class(TMemoryStream)
+  private
+    FAdress: string;
+    FStartTime: TDateTime;
+    FOnDestroy: TNotifyEvent;
+    function getProgress: double;
+    function getSpeed: double;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    property Progress: double read getProgress;
+    property Address: string read FAdress write FAdress;
+    property Speed: double read getSpeed;
+    function Read(var Buffer; Count: integer): integer; override;
+    property OnDestroy: TNotifyEvent read FOnDestroy write FOnDestroy;
+  end;
+
+  IMapKeeper = interface
+    function GetMap(ServReq: string; var MapName: string): TUploadStream;
+  end;
+
   TMapServer = class
   private
     FPort: Word;
     Server: TIdHTTPServer;
     FIsActive: boolean;
-    FConnections: Integer;
+    FConnections: integer;
     FUploads: TObjectList<TUploadStream>;
     FMapKeeper: IMapKeeper;
     procedure Disconnect(AContext: TIdContext);
@@ -19,22 +46,63 @@ type
     procedure CommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo;
       AResponseInfo: TIdHTTPResponseInfo);
     procedure UploadFinish(Sender: TObject);
+    class procedure getPage404(Stream: TStream);
   public
-    constructor Create(MapKeeper: IMapKeeper);
+    constructor Create(const MapKeeper: IMapKeeper);
     destructor Destroy; override;
     procedure Run;
     procedure Stop;
     procedure Restart;
     property Port: Word read FPort write FPort;
-    property Connections: Integer read FConnections;
+    property Connections: integer read FConnections;
     property CurrentUploads: TObjectList<TUploadStream> read FUploads;
   end;
 
 implementation
 
+uses
+  IdURI;
+
+{ TUploadStream }
+
+constructor TUploadStream.Create;
+begin
+  FStartTime := 0;
+end;
+
+destructor TUploadStream.Destroy;
+begin
+  if Assigned(FOnDestroy) then
+    FOnDestroy(self);
+  inherited;
+end;
+
+function TUploadStream.getProgress: double;
+begin
+  if (Assigned(self)) and (Size > 0) then
+    result := Position * 100 / Size
+  else
+    result := 100;
+end;
+
+function TUploadStream.getSpeed: double;
+begin
+  if FStartTime = 0 then
+    result := 0
+  else
+    result := Position / 1024 / ((now - FStartTime) * 60 * 60 * 24);
+end;
+
+function TUploadStream.Read(var Buffer; Count: integer): integer;
+begin
+  result := inherited read(Buffer, Count);
+  if FStartTime = 0 then
+    FStartTime := now;
+end;
+
 { TMapServer }
 
-constructor TMapServer.Create(MapKeeper: IMapKeeper);
+constructor TMapServer.Create(const MapKeeper: IMapKeeper);
 begin
   FMapKeeper := MapKeeper;
   FIsActive := false;
@@ -46,13 +114,14 @@ destructor TMapServer.Destroy;
 begin
   Stop;
   FUploads.Free;
+  FMapKeeper := nil;
   inherited;
 end;
 
 procedure TMapServer.CommandGet(AContext: TIdContext;
   ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
 var
-  stream: TUploadStream;
+  Stream: TUploadStream;
   m_stream: TMemoryStream;
   req, MapName: string;
 begin
@@ -71,16 +140,16 @@ begin
 
     req := StringReplace(req, '.osz', '', [rfReplaceAll]);
 
-    stream := FMapKeeper.GetMap(req, MapName);
+    Stream := FMapKeeper.GetMap(req, MapName);
 
-    if Assigned(stream) then
+    if Assigned(Stream) then
     begin
-      stream.Address := ARequestInfo.RemoteIP;
-      stream.OnDestroy := UploadFinish;
+      Stream.Address := ARequestInfo.RemoteIP;
+      Stream.OnDestroy := UploadFinish;
       TThread.Synchronize(TThread.CurrentThread,
         procedure
         begin
-          FUploads.Add(stream);
+          FUploads.Add(Stream);
         end);
 
       MapName := TIdURI.ParamsEncode(MapName);
@@ -89,8 +158,8 @@ begin
         Format('attachment; filename="%s.osz";', [MapName]);
 
       AResponseInfo.ContentText := '';
-      AResponseInfo.ContentLength := stream.Size;
-      AResponseInfo.ContentStream := stream;
+      AResponseInfo.ContentLength := Stream.Size;
+      AResponseInfo.ContentStream := Stream;
       // тут нельзя разрушить stream.Free; его порушит сам серв
     end
     else
@@ -116,6 +185,20 @@ end;
 procedure TMapServer.Disconnect(AContext: TIdContext);
 begin
   InterlockedDecrement(FConnections);
+end;
+
+class procedure TMapServer.getPage404(Stream: TStream);
+var
+  RS: TResourceStream;
+begin
+  RS := TResourceStream.Create(HInstance, // your app or DLL instance handle
+  '404page', // string containing resource name
+  RT_RCDATA);
+  try
+    Stream.CopyFrom(RS, RS.Size)
+  finally
+    FreeAndNil(RS);
+  end;
 end;
 
 procedure TMapServer.Restart;

@@ -9,7 +9,9 @@ uses
   Core in 'Core.pas',
   MapServer in 'MapServer.pas',
   OsuTrackSpy in 'OsuTrackSpy.pas',
-  FSChangeMonitor in 'FSChangeMonitor.pas';
+  FSChangeMonitor in 'FSChangeMonitor.pas',
+  Config in 'Config.pas',
+  NetUtils in 'NetUtils.pas';
 
 {$R *.res}
 
