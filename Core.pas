@@ -159,20 +159,20 @@ var
   list: TStringList;
   ZipFile: TZipFile;
   i, len: integer;
-  Path: string;
+  pth, zippath: string;
   fs: TFileStream;
 begin
   list := TStringList.Create;
-  GetFileList(Path, list);
+  GetFileList(FPath, list);
   ZipFile := TZipFile.Create;
   ZipFile.Open(Stream, zmWrite);
-  len := Length(Path);
+  len := Length(FPath);
   for i := 0 to list.Count - 1 do
   begin
-    FPath := list[i];
-    fs := TFileStream.Create(FPath, fmOpenRead or fmShareDenyWrite);
-    FPath := list.Strings[i];
-    ZipFile.Add(fs, copy(FPath, len + 2, Length(FPath) - len - 1));
+    pth := list[i];
+    fs := TFileStream.Create(pth, fmOpenRead or fmShareDenyWrite);
+    zippath := copy(pth, len + 2, Length(pth) - len - 1);
+    ZipFile.Add(fs, zippath);
     FreeAndNil(fs);
   end;
   ZipFile.Free;

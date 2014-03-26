@@ -108,7 +108,11 @@ begin
   if Process32First(hSnap, pe) then
     while Process32Next(hSnap, pe) do
       if ExtractFileName(pe.szExeFile) = pName then
+      begin
         Result := OpenProcess(PROCESS_ALL_ACCESS, false, pe.th32ProcessID);
+        break;
+      end;
+  CloseHandle(hSnap);
 end;
 
 { TOsuTrackSpy }
