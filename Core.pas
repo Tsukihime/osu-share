@@ -26,6 +26,7 @@ type
     FSource: string;
     FTags: string;
     FHash: string;
+    FBeatmapSetID: Integer;
     procedure setPath(const Value: string);
   public
     property Path: string read FPath write setPath;
@@ -37,6 +38,7 @@ type
     property Tags: string read FTags write FTags;
     property IsInitialized: boolean read FIsInitialized;
     property Hash: string read FHash write FHash;
+    property BeatmapSetID: Integer read FBeatmapSetID write FBeatmapSetID;
     procedure InitMap;
     procedure getOszStream(Stream: TStream);
   end;
@@ -86,7 +88,7 @@ end;
 
 procedure GetMapList(Path: string; list: TObjectList<TOsuMap>);
 var
-  i: integer;
+  i: Integer;
   SearchRec: TSearchRec;
   map: TOsuMap;
 begin
@@ -137,7 +139,7 @@ end;
 procedure TOsuMap.getOszStream(Stream: TStream);
   procedure GetFileList(const Path: string; list: TStrings);
   var
-    i: integer;
+    i: Integer;
     SearchRec: TSearchRec;
   begin
     try
@@ -158,7 +160,7 @@ procedure TOsuMap.getOszStream(Stream: TStream);
 var
   list: TStringList;
   ZipFile: TZipFile;
-  i, len: integer;
+  i, len: Integer;
   pth, zippath: string;
   fs: TFileStream;
 begin
@@ -181,13 +183,14 @@ end;
 
 procedure TOsuMap.InitMap;
 var
-  i: integer;
+  i: Integer;
   SearchRec: TSearchRec;
-  _path, s: string;
+  _path, s, bts: string;
   slist: TStringList;
 begin
   if FIsInitialized then
     exit;
+  FBeatmapSetID := -1;
   slist := TStringList.Create;
   try
     _path := ExcludeTrailingBackslash(Path);
@@ -210,6 +213,9 @@ begin
             FSource := UTF8ToWideString(copy(s, 8, Length(s) - 7));
           if pos('Tags:', s) > 0 then
             FTags := UTF8ToWideString(copy(s, 6, Length(s) - 5));
+          if pos('BeatmapSetID:', s) > 0 then
+            bts := UTF8ToWideString(copy(s, 14, Length(s) - 13));
+          TryStrToInt(bts, FBeatmapSetID);
         end;
       end;
     except
@@ -277,7 +283,7 @@ end;
 function TOsuShareCore.GetMap(ServReq: string; var MapName: string)
   : TUploadStream;
 var
-  i: integer;
+  i: Integer;
   us: TUploadStream;
 begin
   result := nil;
