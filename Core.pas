@@ -28,6 +28,7 @@ type
     FHash: string;
     FBeatmapSetID: Integer;
     procedure setPath(const Value: string);
+    function GetInfoStr: string;
   public
     property Path: string read FPath write setPath;
     property name: string read FName write FName;
@@ -39,6 +40,7 @@ type
     property IsInitialized: boolean read FIsInitialized;
     property Hash: string read FHash write FHash;
     property BeatmapSetID: Integer read FBeatmapSetID write FBeatmapSetID;
+    property InfoStr: string read GetInfoStr;
     procedure InitMap;
     procedure getOszStream(Stream: TStream);
   end;
@@ -135,6 +137,19 @@ begin
 end;
 
 { TOsuMap }
+
+function TOsuMap.GetInfoStr: string;
+begin
+  if IsInitialized then
+  begin
+    if Source = '' then
+      result := Format('%s - %s [%s]', [Artist, Title, Creator])
+    else
+      result := Format('%s (%s) - %s [%s]', [Source, Artist, Title, Creator]);
+  end
+  else
+    result := FName;
+end;
 
 procedure TOsuMap.getOszStream(Stream: TStream);
   procedure GetFileList(const Path: string; list: TStrings);

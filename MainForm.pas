@@ -32,6 +32,8 @@ type
     CopyLink1: TMenuItem;
     PuushMap1: TMenuItem;
     Icons: TImageList;
+    Openbeatmapfolder1: TMenuItem;
+    Searchinbloodcat1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure SearchEditKeyUp(Sender: TObject; var Key: Word;
@@ -61,6 +63,8 @@ type
     procedure Show1Click(Sender: TObject);
     procedure VSTKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormShow(Sender: TObject);
+    procedure Openbeatmapfolder1Click(Sender: TObject);
+    procedure Searchinbloodcat1Click(Sender: TObject);
   private
     FOsuTrackPath: string;
     FOsuMapIndex: Integer;
@@ -159,6 +163,26 @@ begin
   VST.IterateSubtree(nil, IterateSearchCallback, nil);
 end;
 
+procedure TOsuShareListForm.Searchinbloodcat1Click(Sender: TObject);
+var
+  index: Integer;
+  fpath: string;
+begin
+  index := -1;
+  VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
+  if index < 0 then
+    exit;
+
+  if FCore.MapList[index].BeatmapSetID = 0 then
+    with FCore.MapList[index] do
+      fpath := Format('http://bloodcat.com/osu/?q=%s %s - %s %s',
+        [Source, Artist, Title, Creator])
+  else
+    fpath := Format('http://bloodcat.com/osu/?q=%d&m=s',
+      [FCore.MapList[index].BeatmapSetID]);
+  ShellExecute(0, 'open', PChar(fpath), nil, nil, SW_SHOWNORMAL);
+end;
+
 procedure TOsuShareListForm.IterateSearchCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 var
@@ -167,7 +191,7 @@ begin
   CanPass := true;
   if (length(SearchEdit.Text) > 0) then
     CanPass := (pos(AnsiLowerCase(SearchEdit.Text),
-      AnsiLowerCase(FCore.MapList[Node.index].name)) > 0);
+      AnsiLowerCase(FCore.MapList[Node.index].InfoStr)) > 0);
   Sender.IsVisible[Node] := CanPass;
 end;
 
@@ -198,20 +222,8 @@ end;
 procedure TOsuShareListForm.VSTGetText(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Column: TColumnIndex; TextType: TVSTTextType;
   var CellText: string);
-var
-  map: TOsuMap;
 begin
-  map := FCore.MapList[Node.index];
-  if map.IsInitialized then
-  begin
-    if map.Source = '' then
-      CellText := Format('%s - %s [%s]', [map.Artist, map.Title, map.Creator])
-    else
-      CellText := Format('%s (%s) - %s [%s]', [map.Source, map.Artist,
-        map.Title, map.Creator])
-  end
-  else
-    CellText := map.name;
+  CellText := FCore.MapList[Node.index].InfoStr;
 end;
 
 procedure TOsuShareListForm.VSTKeyDown(Sender: TObject; var Key: Word;
@@ -338,6 +350,20 @@ begin
     Sender.Invalidate;
     Abort := true;
   end;
+end;
+
+procedure TOsuShareListForm.Openbeatmapfolder1Click(Sender: TObject);
+var
+  index: Integer;
+  fpath: string;
+begin
+  index := -1;
+  VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
+  if index < 0 then
+    exit;
+  fpath := IncludeTrailingBackslash(FCore.MapList[index].Path);
+  ShellExecute(self.Handle, 'open', PChar(fpath), '', PChar(fpath),
+    SW_SHOWNORMAL);
 end;
 
 procedure TOsuShareListForm.PuushButtonClick(Sender: TObject);

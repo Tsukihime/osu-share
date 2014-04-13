@@ -88,7 +88,10 @@ begin
         begin
           http := TIdHTTP.Create(nil);
           try
-            FIP := http.Get('http://v4.ipv6-test.com/api/myip.php');
+            try
+              FIP := http.Get('http://v4.ipv6-test.com/api/myip.php');
+            except
+            end;
             TThread.Synchronize(TThread.CurrentThread,
               procedure
               begin
