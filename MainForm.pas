@@ -34,6 +34,7 @@ type
     Icons: TImageList;
     Openbeatmapfolder1: TMenuItem;
     Searchinbloodcat1: TMenuItem;
+    GoToCurrentMap: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure SearchEditKeyUp(Sender: TObject; var Key: Word;
@@ -65,20 +66,21 @@ type
     procedure FormShow(Sender: TObject);
     procedure Openbeatmapfolder1Click(Sender: TObject);
     procedure Searchinbloodcat1Click(Sender: TObject);
+    procedure GoToCurrentMapClick(Sender: TObject);
   private
     FOsuTrackPath: string;
     FOsuMapIndex: Integer;
     FCopyMapLinkHotKey: Word;
     FPortStatusIcon: TImage;
     FCore: TOsuShareCore;
-    procedure IterateSearchCallback(Sender: TBaseVirtualTree;
+    procedure HideUnrelatedItemsSearchCallback(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
-    procedure IterateSelCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
-      Data: Pointer; var Abort: Boolean);
-    procedure IterateUpdateCallback(Sender: TBaseVirtualTree;
+    procedure GetSelectedItemCallback(Sender: TBaseVirtualTree;
       Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
-    procedure IterateFlashCallback(Sender: TBaseVirtualTree; Node: PVirtualNode;
-      Data: Pointer; var Abort: Boolean);
+    procedure UpdateMapInfoCallback(Sender: TBaseVirtualTree;
+      Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+    procedure SelectPlayingMapCallback(Sender: TBaseVirtualTree;
+      Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
     procedure IdleEventHandler(Sender: TObject; var Done: Boolean);
     procedure WMHotKey(var HTK: TWMHotKey); message WM_HOTKEY;
   end;
@@ -160,7 +162,7 @@ end;
 procedure TOsuShareListForm.SearchEditKeyUp(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 begin
-  VST.IterateSubtree(nil, IterateSearchCallback, nil);
+  VST.IterateSubtree(nil, HideUnrelatedItemsSearchCallback, nil);
 end;
 
 procedure TOsuShareListForm.Searchinbloodcat1Click(Sender: TObject);
@@ -169,7 +171,7 @@ var
   fpath: string;
 begin
   index := -1;
-  VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
+  VST.IterateSubtree(nil, GetSelectedItemCallback, @index, [vsSelected]);
   if index < 0 then
     exit;
 
@@ -178,13 +180,14 @@ begin
       fpath := Format('http://bloodcat.com/osu/?q=%s %s - %s %s',
         [Source, Artist, Title, Creator])
   else
-    fpath := Format('http://bloodcat.com/osu/?q=%d&m=s',
+    fpath := Format('http://bloodcat.com/osu/?q=%d&c=s',
       [FCore.MapList[index].BeatmapSetID]);
   ShellExecute(0, 'open', PChar(fpath), nil, nil, SW_SHOWNORMAL);
 end;
 
-procedure TOsuShareListForm.IterateSearchCallback(Sender: TBaseVirtualTree;
-  Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
+procedure TOsuShareListForm.HideUnrelatedItemsSearchCallback
+  (Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer;
+  var Abort: Boolean);
 var
   CanPass: Boolean;
 begin
@@ -216,7 +219,16 @@ procedure TOsuShareListForm.VSTGetImageIndex(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Kind: TVTImageKind; Column: TColumnIndex;
   var Ghosted: Boolean; var ImageIndex: Integer);
 begin
-  ImageIndex := 2;
+  if not(Kind in [ikNormal, ikSelected]) then // very powerful magic
+    ImageIndex := -1
+  else
+  begin
+    // normal code here
+    if Node.index = FOsuMapIndex then
+      ImageIndex := 7
+    else
+      ImageIndex := 2;
+  end;
 end;
 
 procedure TOsuShareListForm.VSTGetText(Sender: TBaseVirtualTree;
@@ -253,7 +265,7 @@ begin
   end;
 end;
 
-procedure TOsuShareListForm.IterateFlashCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.SelectPlayingMapCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   if Integer(Data) = Node.index then
@@ -270,7 +282,7 @@ var
   s: string;
 begin
   i := -1;
-  VST.IterateSubtree(nil, IterateSelCallback, @i, [vsSelected]);
+  VST.IterateSubtree(nil, GetSelectedItemCallback, @i, [vsSelected]);
   if i = -1 then
     exit;
   if FCore.MapList[i].IsInitialized then
@@ -293,11 +305,16 @@ begin
   Show;
 end;
 
-procedure TOsuShareListForm.IterateSelCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.GetSelectedItemCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   Integer(Data^) := Node.index;
   Abort := true;
+end;
+
+procedure TOsuShareListForm.GoToCurrentMapClick(Sender: TObject);
+begin
+  VST.IterateSubtree(nil, SelectPlayingMapCallback, Pointer(FOsuMapIndex));
 end;
 
 procedure TOsuShareListForm.Timer1Timer(Sender: TObject);
@@ -322,7 +339,8 @@ begin
         if s = FCore.MapList[i].Path then
         begin
           FOsuMapIndex := i;
-          VST.IterateSubtree(nil, IterateFlashCallback, Pointer(i));
+          VST.IterateSubtree(nil, SelectPlayingMapCallback,
+            Pointer(FOsuMapIndex));
           break;
         end;
     end;
@@ -340,7 +358,7 @@ begin
   end;
 end;
 
-procedure TOsuShareListForm.IterateUpdateCallback(Sender: TBaseVirtualTree;
+procedure TOsuShareListForm.UpdateMapInfoCallback(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 begin
   if (Sender.IsEffectivelyVisible[Node]) and
@@ -358,7 +376,7 @@ var
   fpath: string;
 begin
   index := -1;
-  VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
+  VST.IterateSubtree(nil, GetSelectedItemCallback, @index, [vsSelected]);
   if index < 0 then
     exit;
   fpath := IncludeTrailingBackslash(FCore.MapList[index].Path);
@@ -373,7 +391,7 @@ var
   songname, FilePath: string;
 begin
   index := -1;
-  VST.IterateSubtree(nil, IterateSelCallback, @index, [vsSelected]);
+  VST.IterateSubtree(nil, GetSelectedItemCallback, @index, [vsSelected]);
   if index < 0 then
     exit;
   songname := FCore.MapList[index].name;
@@ -438,7 +456,7 @@ end;
 procedure TOsuShareListForm.IdleEventHandler(Sender: TObject;
   var Done: Boolean);
 begin
-  VST.IterateSubtree(nil, IterateUpdateCallback, nil, [vsVisible]);
+  VST.IterateSubtree(nil, UpdateMapInfoCallback, nil, [vsVisible]);
   Done := true;
 end;
 

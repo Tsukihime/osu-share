@@ -64,7 +64,7 @@ BOOL WINAPI DetourShellExecuteExW(LPSHELLEXECUTEINFOW pExecInfo) {
 	wchar_t new_str_buff[MAX_PATH];
 	wchar_t* new_str = &new_str_buff[0];
 	LPCWSTR pfile = pExecInfo->lpFile;
-	const wchar_t* pattern = L"http://osu.ppy.sh/b/";
+	const wchar_t* pattern = L"://osu.ppy.sh/b/";
 
 	if (ctrlDown) {
 		const wchar_t * pNum = wcsstr(pExecInfo->lpFile, pattern);
@@ -164,6 +164,8 @@ DWORD WINAPI DllMain(HINSTANCE hInst, DWORD dwReason, LPVOID lpReserved) {
 	switch (dwReason) {
 	case DLL_PROCESS_ATTACH:
 
+		// MSDN: CreateThread function
+		// During process startup and DLL initialization routines, new threads can be created, but they do not begin execution until DLL initialization is done for the process.
 		CreateThread(0, 0, &Initialize, 0, 0, 0);
 		// Initialize once for each new process.
 		// Return FALSE to fail DLL load.
