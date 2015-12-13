@@ -16,9 +16,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 - program configures the automatically.
 - fine-tuning can be done by editing the file "osu!share.ini" (need restart).
-- share maps function require your PC to be able to accept incoming connections on port 778 (default). some information may be found here http://en.wikipedia.org/wiki/Port_forwarding
+- Sharing Maps functionality(through links on your local web server) requires your PC  would be able to receive incoming connections on the port 778(configured by default). Some information may be found here http://en.wikipedia.org/wiki/Port_forwarding
 
-- Puush map function requires installed [puush](http://puush.me/)
+- "Puush map" functionality requires [puush](http://puush.me/) to be installed
+
 - Copy link - copies beatmap link from local webserver to clipboard
 
 ###Features
